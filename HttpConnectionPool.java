@@ -52,6 +52,8 @@ final class HttpConnectionPool {
 	 private final HashMap<HttpConnection.Address, List<HttpConnection>> connectionPool_M
             = new HashMap<HttpConnection.Address, List<HttpConnection>>();
 
+	private int type;
+
     private HttpConnectionPool() {
         // CSE 622
 		String keepAlive = "true";//System.getProperty("http.keepAlive");
@@ -71,6 +73,8 @@ final class HttpConnectionPool {
 		// First try to reuse an existing HTTP connection.
         synchronized (/*connectionPool*/lock) {
             List<HttpConnection> connections = null;
+            
+            this.type = TYPE;
 			if(TYPE == 1)
 				connections = connectionPool_W.get(address);
 			else if(TYPE == 2)
@@ -89,7 +93,7 @@ final class HttpConnectionPool {
                     // Since Socket is recycled, re-tag before using
 					//Socket socket = connection.getSocket();
                     //SocketTagger.get().tag(socket);
-                    //if(HttpHelper.logEnable)
+                    ////if(HttpHelper.logEnable)
 						System.out.println("622 - HttpConnectionPool: Found REUSABLE CONNECTION...");
 					return connection;
                 }
@@ -99,13 +103,13 @@ final class HttpConnectionPool {
          * We couldn't find a reusable connection, so we need to create a new
          * connection. We're careful not to do so while holding a lock!
          */
-        //if(HttpHelper.logEnable)
+        ////if(HttpHelper.logEnable)
 		//	System.out.println("622 - HttpConnectionPool: No reusable connection...creating a new one");
-		return address.connect(connectTimeout);
+		return address.connect(connectTimeout, type);
     }
 
     public void recycle(HttpConnection connection, int TYPE) {
-        //if(HttpHelper.logEnable)
+        ////if(HttpHelper.logEnable)
 		//	System.out.println("622 - HttpConnectionPool - Inside recycle()...");
 		
 		/*
@@ -142,7 +146,7 @@ final class HttpConnectionPool {
                 if (connections.size() < maxConnections) {
                     connection.setRecycled();
                     connections.add(connection);
-                    //if(!HttpURLConnectionImpl.isVanilla && HttpHelper.logEnable)
+                    //if(!HttpURLConnectionImpl.isMic && HttpHelper.logEnable)
 						System.out.println("622 - HttpConnectionPool - recycle() - Successful");
 					return; // keep the connection open
                 }

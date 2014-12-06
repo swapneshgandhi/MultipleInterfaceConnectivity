@@ -17,7 +17,6 @@
 
 package libcore.net.http;
 
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,11 +65,14 @@ final class HttpConnection {
 	private InputStream sslInputStream;
 	private OutputStream sslOutputStream;
 	private boolean recycled = false;
+	private int type;
 
-	private HttpConnection(Address config, int connectTimeout) throws IOException {
+	private HttpConnection(Address config, int connectTimeout, int type) throws IOException {
 		this.address = config;
 		//System.out.println("MIC: HttpConnection :: HttpConnection(Address config = "+config.toString()+", connectTimeout = "+Integer.toString(connectTimeout)+")");
 		System.out.println("MIC: HttpConnection :: HttpConnection(Address config , connectTimeout)");
+		
+		this.type = type;
 		/*
 		 * Try each of the host's addresses for best behavior in mixed IPv4/IPv6
 		 * environments. See http://b/2876927
@@ -83,42 +85,46 @@ final class HttpConnection {
 					? new Socket(config.proxy)
 			: new Socket();
 
-					if(!HttpURLConnectionImpl.isVanilla) {
+					if(!HttpURLConnectionImpl.isMIC) {
 						InetSocketAddress localSockAddress = null;
-						HttpHelper.newConnection.add(System.currentTimeMillis());
+						//HttpHelper.newConnection.add(System.currentTimeMillis());
 						String ip;
-						if(HttpHelper.logEnable)
+						////if(HttpHelper.logEnable)
 							System.out.println("622 - HttpConnection : HttpConnection() - Getting Interface IP Address");
 						try {
-							if (HttpHelper.WIFI) {
+							if (this.type == 1) {
 								HttpHelper.connections_wifi++;
 								ip = ConnectionStatus.getIp(1);
 								localSockAddress = new InetSocketAddress(ip, 0);//HttpHelper.getInterfaceIPAddr(1);
-								System.out.println("622 - HttpConnection() - Binding to WIFI IP Address = " + localSockAddress + " getIP = "+ip);
+								System.out.println("622 - HttpConnection() - Binding to WIFI IP Address = " + localSockAddress + "; getIP = "+ip);
 								socketCandidate.bind((SocketAddress)localSockAddress);
+								//socketCandidate.connect((SocketAddress)localSockAddress, connectTimeout);
 							}
-							else if (HttpHelper.MOBILE) {
+							else if (this.type == 2) {
 								HttpHelper.connections_mobile++;
 								ip = ConnectionStatus.getIp(2);
 								localSockAddress = new InetSocketAddress(ip, 0);//HttpHelper.getInterfaceIPAddr(2);
-								System.out.println("622 - HttpConnection() - Binding to Mobile IP Address = " + localSockAddress + " getIP = "
+								System.out.println("622 - HttpConnection() - Binding to Mobile IP Address = " + localSockAddress + "; getIP = "
 										+ ip);
 								socketCandidate.bind((SocketAddress)localSockAddress);
+								//socketCandidate.connect((SocketAddress)localSockAddress, connectTimeout);
 							}	
 						} catch (Exception ex) {
 							System.out.println("622 - Exception in HttpConnection.java ....");  
 							ex.printStackTrace();
 						}
 					}
-					try {
-						System.out.println("MIC: HttpConnection : HttpConnection() -> Calling socketCandidate.connect()");
-						socketCandidate.connect(new InetSocketAddress(addresses[i], config.socketPort), connectTimeout);
-						break;
-					} catch (IOException e) {
-						if (i == addresses.length - 1) {
-							throw e;
+					//else {
+						try {
+							System.out.println("MIC: HttpConnection : HttpConnection() -> Calling socketCandidate.connect()");
+							socketCandidate.connect(new InetSocketAddress(addresses[i], config.socketPort), connectTimeout); //// this call binds the socket 
+							break;
+						} catch (IOException e) {
+							if (i == addresses.length - 1) {
+								throw e;
+							}
 						}
-					}
+					//}
 		}
 
 
@@ -136,7 +142,7 @@ final class HttpConnection {
 			Address address = (proxy.type() == Proxy.Type.DIRECT)
 					? new Address(uri, sslSocketFactory)
 			: new Address(uri, sslSocketFactory, proxy, requiresTunnel);
-					return HttpConnectionPool.INSTANCE.get(address, connectTimeout, TYPE);
+					return HttpConnectionPool.INSTANCE.get(address, connectTimeout, TYPE);///////////// this leads to Address.connect()
 		}
 
 		/*
@@ -166,7 +172,7 @@ final class HttpConnection {
 		/*
 		 * Try a direct connection. If this fails, this method will throw.
 		 */
-		//if(HttpHelper.logEnable)
+		////if(HttpHelper.logEnable)
 		//	System.out.println("622 - HttpConnection: Getting instance from connection pool"); 
 		return HttpConnectionPool.INSTANCE.get(new Address(uri, sslSocketFactory), connectTimeout, TYPE);
 	}
@@ -245,7 +251,7 @@ final class HttpConnection {
 	 * TLS extensions and SSL deflate compression. If false, use
 	 * an SSL3 only fallback mode without compression.
 	 */
-	public void setupSecureSocket(SSLSocketFactory sslSocketFactory, boolean tlsTolerant)
+	public void setupSecureSocket(SSLSocketFactory sslSocketFactory, boolean tlsTolerant)///////////////////////////////
 			throws IOException {
 		System.out.println("MIC: HttpConnection : setupSecureSocket()");
 		// create the wrapper over connected socket
@@ -314,7 +320,7 @@ final class HttpConnection {
 				&& !socket.isInputShutdown()
 				&& !socket.isOutputShutdown();
 		System.out.println("622 - HttpConnection - isEligibleForRecycling() = " + result);
-		//if(HttpHelper.logEnable)
+		////if(HttpHelper.logEnable)
 		//	System.out.println("622 - HttpConnection - isEligibleForRecycling = " + result + ", isClosed = " + socket.isClosed()
 		//					+ ", isInputShutDown = " + socket.isInputShutdown() + ", isOutputShutdown = " 
 		//					+ socket.isOutputShutdown());
@@ -335,6 +341,7 @@ final class HttpConnection {
 		private final String socketHost;
 		private final int socketPort;
 		private final SSLSocketFactory sslSocketFactory;
+		private int type;
 
 		public Address(URI uri, SSLSocketFactory sslSocketFactory) throws UnknownHostException {
 			this.proxy = null;
@@ -406,9 +413,10 @@ final class HttpConnection {
 			return result;
 		}
 
-		public HttpConnection connect(int connectTimeout) throws IOException {
+		public HttpConnection connect(int connectTimeout, int type) throws IOException {
 			System.out.println("MIC: HttpConnection : Address : connect()");
-			return new HttpConnection(this, connectTimeout);
+			
+			return new HttpConnection(this, connectTimeout, type);
 		}
 	}
 }

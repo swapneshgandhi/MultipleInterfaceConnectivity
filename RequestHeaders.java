@@ -62,6 +62,7 @@ public final class RequestHeaders {
     private String proxyAuthorization;
 	
 	private String chunk;
+	private static int number = 0;
 
     public RequestHeaders(URI uri, RawHeaders headers) {
         this.uri = uri;
@@ -122,6 +123,8 @@ public final class RequestHeaders {
 				chunk = value.split("=")[1];
 			}
         }
+        
+        number++;
     }
 
 	public String getChunkMarkers() {
@@ -297,5 +300,11 @@ public final class RequestHeaders {
                 headers.addAll(key, entry.getValue());
             }
         }
+    }
+    
+    public void printHeaders()
+    {
+    	System.out.println("MIC : RequestHeaders: printHeaders()");
+    	headers.printRawHeaders("Request Number = "+Integer.toString(number));
     }
 }

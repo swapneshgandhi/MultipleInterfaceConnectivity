@@ -2,6 +2,7 @@ package libcore.net.http;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 
 public class MicHttpEngine {
 
@@ -11,7 +12,10 @@ public class MicHttpEngine {
 	boolean isComplete;
 	ConnectionStatus connStatus;
 	byte data[];
-	NewWorker W1, W2;
+	NewWorker w1, w2;
+	Object returnLock = new Object();
+	private NewHelper helper;
+	NewStatistics stats;
 	
 	public MicHttpEngine(HttpURLConnectionImpl impl) {	
 		
@@ -19,12 +23,13 @@ public class MicHttpEngine {
 		headResponse = httpImpl.headResponse;
 		inputStream = new NewByteArrayBackedInputStream(headResponse.contentLength(), headResponse.contentLength(), 0);
 		isComplete = false;
-		connStatus = new ConnectionStatus(this, 0);	
+		connStatus = new ConnectionStatus(this, 0);
+		stats = new NewStatistics();
 		
 	}
 	
 	// to be called from workers for getting info of chunks to be downloaded
-	public synchronized ChunkInfo getChunkInfo(int speed, int workerType) {
+	public synchronized ArrayList<ChunkInfo> getChunkInfo(long speed, int workerType) {
 		
 		return inputStream.getChunksForWorker(speed, workerType);
 	}
@@ -36,24 +41,30 @@ public class MicHttpEngine {
 		try
 		{
 			System.err.println("MIC: MicHttpEngine: setChunk(): calling stream.read()");
-			stream.read(data, 0, data.length);
-			System.err.println("MIC: MicHttpEngine: setChunk(): stream.read() successful");
+			int result = stream.read(data, 0, data.length);
+			System.err.println("MIC: MicHttpEngine: setChunk(): stream.read() successful: Result = " + String.valueOf(result));
 		}
 		catch (IOException e) {
 			
 			System.err.println("MIC: MicHttpEngine: setChunk(): Exception in stream.read(): "+e.getMessage());
 			e.printStackTrace();
 		}
+		
+		System.err.println("MIC: MicHttpEngine: setChunk(): skipping inputStream.write()");
+		
+		
 		try
 		{
 			System.err.println("MIC: MicHttpEngine: setChunk(): calling inputStream.write()");
 			inputStream.write(strtOffset, data, type, size);
 			System.err.println("MIC: MicHttpEngine: setChunk(): inputStream.write() successful");
-		} catch (InterruptedException e) {
-			
+		}
+		catch (InterruptedException e)
+		{			
 			System.err.println("MIC: MicHttpEngine: setChunk(): Exception in inputStream.write(): "+e.getMessage());
 			e.printStackTrace();
 		}
+		
 	}
 	
 	public synchronized void setMissingChunk(int strtOffset,  int end) {
@@ -63,10 +74,19 @@ public class MicHttpEngine {
 		System.err.println("MIC: MicHttpEngine: setMissingChunk(): done for chunk: "+strtOffset+" - "+end);
 	}
 	
-	public void startWorkers() {
+	public void startWorkers(MicHttpURLConnectionImpl micHttpImpl) {
 		
-		W1 = new NewWorker(httpImpl, connStatus, this, "wifi");
-		W2 = new NewWorker(httpImpl, connStatus, this, "mobile");		
+		synchronized (returnLock)
+		{
+			w1 = new NewWorker(httpImpl, connStatus, this, "wifi",stats);
+			w2 = new NewWorker(httpImpl, connStatus, this, "mobile",stats);
+			helper = new NewHelper(w1, w2, micHttpImpl.resultLock,stats);
+		}
+	}
+	
+	public NewByteArrayBackedInputStream getStream()
+	{
+		return inputStream;
 	}
 }
 

@@ -19,6 +19,7 @@ import java.io.FileDescriptor;
 import java.io.File;
 import libcore.io.IoUtils;
 import libcore.io.Libcore;
+import libcore.net.http.HttpsURLConnectionImpl.HttpUrlConnectionDelegate;
 import static libcore.io.OsConstants.*;
 
 //@TODO - Collect statistics for failed and discarded chunks from here as well as from the Buffer
@@ -35,7 +36,7 @@ public class HttpWorker extends Thread {
 	private int redirectionCount;
 	private int marker;
 	private int chunkSize;
-	private boolean isHttps;
+
 	private boolean isThrottle;
 	private boolean logEnable;
 
@@ -62,34 +63,17 @@ public class HttpWorker extends Thread {
 	boolean isSenderDone = false;
 	//boolean got416 = false;
 	int downloadSize = -1;
+	private HttpUrlConnectionDelegate httpSimpl;
 
-	public HttpWorker(HttpURLConnectionImpl i, HttpHelper hp, String t, boolean doOutput) {
-		this.isHttps = i.isHttps;
+	public HttpWorker(HttpURLConnectionImpl i, HttpHelper hp, String intType) {
 		helper = hp;
-		type = t;
+		type = intType;
 		TYPE = (type.equals("wifi"))?1:2;
 		impl = i;
+		method = impl.getRequestMethod();
 		redirectionCount = 0;
 		throttleVal = HttpHelper.Throttle;
 		isThrottle = (throttleVal > 0)?true:false;
-		try {
-			if (doOutput) {
-				System.out.println("MIC: HttpWorker() ->  doOutput = true");
-				if (method == HttpEngine.GET) {
-					System.out.println("MIC: HttpWorker ->  method = "+method);
-					// they are requesting a stream to write to. This implies a POST method
-					method = HttpEngine.POST;
-					System.out.println("MIC: HttpWorker() ->  set method to "+method);
-				} else if (method != HttpEngine.POST && method != HttpEngine.PUT) {
-					// If the request method is neither POST nor PUT, then you're not writing
-					throw new ProtocolException(method + " does not support writing");
-				}
-			}			
-		} catch (IOException e) {
-			System.out.println("MIC: HttpWorker:: Exception in Changing method: ");
-			e.printStackTrace();
-			//throw e;
-		}
 		logEnable = HttpHelper.logEnable;
 		cap = helper.getBufferSize() / 2;
 		avg = new Average();
@@ -152,12 +136,14 @@ public class HttpWorker extends Thread {
 		public void run() {
 			System.out.println("622 - Worker: <" + type + "> ... Reader Kicked in...");
 			boolean runOnce = true;
+			//boolean runOnce = false;
 			HttpEngine engine = null;
 			int start=0,end=0;
 			int responseCode = 0;
 			int lastChunkStart = -1;
 			while(true) {
-				try {
+				try
+				{
 					responseCode = 0;
 					synchronized(mLock) {
 						while(requestQueue.size() == 0) {
@@ -181,9 +167,11 @@ public class HttpWorker extends Thread {
 					}
 
 					engine.readResponse();
+					System.out.println("MIC: HttpWorker: <" + type + "> : Printing Response Header:");
+					engine.printResponseHeaders();
 					responseCode = engine.getResponseCode();
 					/* Fix for CaptivePortal tracker - 204 */
-					/* Fix for HTTP_OK - 200. Some servers like wikipedia return 200 instead of 206 i.e. these servers does not serve byte-range requests */
+					/* Fix for HTTP_OK - 200. Some servers like wikipedia return 200 instead of 206 i.e. these servers do not serve byte-range requests */
 
 					if(responseCode == HttpURLConnection.HTTP_NO_CONTENT /*204*/ || responseCode == HttpURLConnection.HTTP_OK/*200*/)
 					{
@@ -207,11 +195,20 @@ public class HttpWorker extends Thread {
 
 
 					String chunk = engine.getChunkMarkings();
+					System.out.println("MIC: HttpWorker: <" + type + "> : Chunk Response Range = "+ chunk);
+
 					/* This will throw if response code is anything but 206 (Partial Content) */
-					start = Integer.parseInt(chunk.split("-")[0]);
-					end = Integer.parseInt(chunk.split("-")[1]);
-					if(logEnable)
-						System.out.println("622 - Worker: <" + type + ">...response code for chunk = " + start + " - " + end 													+ " == " + responseCode);
+
+					try {
+						start = Integer.parseInt(chunk.split("-")[0]);
+						end = Integer.parseInt(chunk.split("-")[1]);
+						if(logEnable)
+							System.out.println("622 - Worker: <" + type + ">...response code for chunk = " + start + " - " + end 													+ " == " + responseCode);
+					} catch (Exception e) {
+						// TODO Auto-generated catch block
+						System.out.println("MIC: HttpWorker: <" + type + "> : Exception in getting  start/end of chunk: "+ e.getMessage());
+						e.printStackTrace();
+					}
 
 					//else/*Successful*/ {
 
@@ -220,6 +217,7 @@ public class HttpWorker extends Thread {
 
 					if(runOnce) {
 						synchronized(HttpHelper.joinLock) {
+							System.out.println("MIC: HttpWorker: <" + type + "> : runOnce = true ... joinLock.notify()");
 							HttpHelper.joinLock.notify();
 						}   
 						runOnce = false;
@@ -256,7 +254,8 @@ public class HttpWorker extends Thread {
 						buffer.flush();
 						data = buffer.toByteArray();
 						if(logEnable)
-							System.out.println("622 - Worker: <" + type + ">... KEY = " + start + "...downloaded bytes = " + bytesRead + "/" + (end-start+1));
+							System.out.println("622 - Worker: <" + type + ">... KEY = " + start + "...downloaded bytes = " + 
+									bytesRead + "/" + (end-start+1));
 						//@TODO - Fix this
 						long timeTakenIncSocketCreation = System.currentTimeMillis() - startTime;
 						//engine.getRequestTimeStampMillis();
@@ -273,7 +272,7 @@ public class HttpWorker extends Thread {
 							prevChunkSize = chunkSize;
 						}
 
-
+						System.out.println("622 - Worker: <" + type + ">... writing chunk to bArrInpStream for KEY = " + start);
 						helper.bArrInpStream.write(start, data, TYPE, bytesRead, engine.getRequestTimeStamp(), 
 								timeTakenIncSocketCreation, engine.getRequestTimeStampMillis());
 
@@ -298,6 +297,7 @@ public class HttpWorker extends Thread {
 
 				} catch (Exception e) {
 					if(logEnable)
+						////////////////////
 						System.out.println("622 - Worker: <" + type + "> ...Exception in Reader...code = " + responseCode);
 					if(responseCode == 504) {
 						if(logEnable)
@@ -320,8 +320,11 @@ public class HttpWorker extends Thread {
 						lastChunkStart = start;
 						helper.set416();
 						//return;
-					} 
-					else {
+					}
+					else
+					{
+
+						/////////////////// comes here when code = 0
 
 						if(downloadSize != -1) {
 							try {
@@ -351,14 +354,13 @@ public class HttpWorker extends Thread {
 							}
 							if(logEnable)
 								e.printStackTrace();
-						} else {
+						} else
+						{
 							System.out.println("622 -  Worker: <" + type + ">...Reader in Exception downloadSize not set!!!");
 							e.printStackTrace();
 							return;
 						}
-
 					}
-
 				}
 				try{
 					synchronized(mLock) {
@@ -368,7 +370,6 @@ public class HttpWorker extends Thread {
 					System.out.println("622 - Worker: <" + type + ">...Reader exception while notifying...");
 					ae.printStackTrace();
 				}
-
 			}
 		}
 	}
@@ -608,6 +609,9 @@ public class HttpWorker extends Thread {
 						}
 					}
 
+
+					/////////////// marker for download queue is set here.. this decides start of byte range for next requests
+
 					synchronized(helper.lock) {
 						marker = helper.getMarker();
 						int newMarker = marker + chunkSize;
@@ -628,18 +632,25 @@ public class HttpWorker extends Thread {
 
 				RawHeaders tmpHeader = new RawHeaders();
 				tmpHeader.set("Range", "bytes=" + start + "-" + end);
-				if(impl.mUrl.getProtocol().toLowerCase().equals("https"))
+				if(impl.getURL().getProtocol().toLowerCase().equals("https"))
 				{
-					System.out.println("MIC: HttpWorker: HttpWorker.run() : HTTPS url : "+ impl.mUrl.toString());
+					System.out.println("MIC: HttpWorker: HttpWorker.run() : HTTPS url : "+ impl.getURL().toString());
 				}
 				tmpHeader.set("Connection", "keep-alive");
 
 				//////////////// new HttpEngine intance is created. Source of error?
 
-				engine = new HttpEngine(TYPE, impl, method, tmpHeader, null, null); 
+				//engine = impl.new HttpEngine(TYPE, impl, method, tmpHeader, null, null);
+				if(impl.isHttps())
+				{
+					System.out.println("MIC: HttpWorker <"+type+"> : impl isHttps");
+					impl = (HttpUrlConnectionDelegate)impl;
+				}
+				System.out.println("MIC: HttpWorker <"+type+"> : calling newHttpEngine()");
+				engine = impl.newHttpEngine(TYPE, method, tmpHeader, null, null);
 
 				if(logEnable)
-					System.out.println("622 - Worker: <" + type + ">...sending to " + impl.mUrl.toString() + 
+					System.out.println("622 - Worker: <" + type + ">...sending to " + impl.getURL().toString() + 
 							" ........bytes = " + start + " - " + end);
 
 				synchronized(helper.lock) {

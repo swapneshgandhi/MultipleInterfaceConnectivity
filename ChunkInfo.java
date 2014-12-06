@@ -2,47 +2,37 @@ package libcore.net.http;
 
 public class ChunkInfo {
 	
-	int chunkSize, startOffset, noChunks;
+	int chunkStart, chunkEnd;
 	boolean isComplete;
+
+	public void setIsComplete(boolean status){
+		this.isComplete = status;
+	}
+
+	public void setChunkStart(int chunkStart){
+		this.chunkStart = chunkStart;
+	}
+
+	public void setChunkEnd(int chunkEnd){
+		this.chunkEnd = chunkEnd;
+	}
+
+	public boolean getIsComplete(){
+		return this.isComplete;
+	}
+
+	public int getChunkStart(){
+		return this.chunkStart;	
+	}
+
+	public int getChunkEnd(){
+		return this.chunkEnd;
+	}
 	
-	public boolean isComplete() {
-		return isComplete;
-	}
-
-	public void setComplete(boolean isComplete) {
-		this.isComplete = isComplete;
-	}
-
-	public int getChunkSize() {
-		return chunkSize;
-	}
-
-	public void setChunkSize(int chunkSize) {
-		this.chunkSize = chunkSize;
-	}
-
-	public int getStartOffset() {
-		return startOffset;
-	}
-
-	public void setStartOffset(int startOffset) {
-		this.startOffset = startOffset;
-	}
-
-	public int getNoChunks() {
-		return noChunks;
-	}
-
-	public void setNoChunks(int noChunks) {
-		this.noChunks = noChunks;
-	}
-
-	public ChunkInfo(int chnkSz, int strtOffset, int noChnks)
+	public ChunkInfo(int chunkStart, int chunkEnd)
 	{
-		chunkSize = chnkSz;
-		startOffset = strtOffset;
-		noChunks = noChnks;
+		this.chunkStart = chunkStart;
+		this.chunkEnd = chunkEnd;
 		isComplete = false;
 	}
 }
-

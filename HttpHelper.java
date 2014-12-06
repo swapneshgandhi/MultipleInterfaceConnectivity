@@ -210,9 +210,9 @@ public class HttpHelper {
 			Throttle = Integer.parseInt(obj.readLine());
 			int log = Integer.parseInt(obj.readLine());
 			int disableConnStatusThread = Integer.parseInt(obj.readLine());
-			runConnStatusThread = (disableConnStatusThread == 0)?false:true;
+			runConnStatusThread = (disableConnStatusThread == 0) ? false:true;
 			System.out.println("MIC: HttpHelper :: HttpHelper() -> Calling ConnectionStatus(this, disableConnStatusThread)");
-			connStatus = new ConnectionStatus(this, disableConnStatusThread);
+			//connStatus = new ConnectionStatus(this, disableConnStatusThread);
 			IMPL_TYPE = (obj.readLine().equalsIgnoreCase("F")) ? FIX_SZ : VAR_SZ;
 			if(IMPL_TYPE == FIX_SZ) {
 				chunkSize = Integer.parseInt(obj.readLine());
@@ -273,7 +273,7 @@ public class HttpHelper {
 		try {
             //fd = Libcore.os.socket(AF_INET, SOCK_DGRAM, 0); 
             localAddress = ConnectionStatus.getIp(type);//Libcore.os.ioctlInetAddress(fd, SIOCGIFADDR, "wlan0");
-                //if(HttpHelper.logEnable)
+                //////if(HttpHelper.logEnable)
 			System.out.println("622: TYPE = " + type + " ...Using IP address: " + localAddress );
             if(localAddress != null) {
 				localSockAddress = new InetSocketAddress(localAddress, 0); 
@@ -312,7 +312,7 @@ public class HttpHelper {
 		try {
 			writer = new PrintWriter(file, "UTF-8");
 			
-		//if(HttpHelper.logEnable)
+		//////if(HttpHelper.logEnable)
 		//	System.out.println("622 - **************STATISTICS********************");
 		//int start = 0;
 		//long totalTime = 0;
@@ -400,7 +400,7 @@ public class HttpHelper {
 			writer.close();
 		}  
 
-		//if(HttpHelper.logEnable) {
+		//////if(HttpHelper.logEnable) {
 			System.out.println("622 - *****************************Results*******************************");
 			System.out.println("622: Wifi: #chunks = " + wifiDownloads + " || #bytes = " + wifiBytes);
 			System.out.println("622: Mobile: #chunks = " + mobileDownloads + " || #bytes = " + mobileBytes);
@@ -457,12 +457,12 @@ public class HttpHelper {
 	public InputStream getStream() throws Exception{
 		
 		if(!supportByteRequest) {
-			if(HttpHelper.logEnable)
+			////if(HttpHelper.logEnable)
 				System.out.println("622 - getStream(): NO Support for BYTE RANGE REQUESTs");
 			return noByteRequestSupport;
 		}
 		else {
-			if(HttpHelper.logEnable)
+			////if(HttpHelper.logEnable)
 				System.out.println("622 - getStream(): Buffering Case");
 			return bArrInpStream;
 		}

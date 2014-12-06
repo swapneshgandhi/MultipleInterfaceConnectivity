@@ -113,6 +113,9 @@ public final class ResponseHeaders {
 	
 	private String chunk;
 	private int SIZE = -1;
+	private static int number = 0;
+	
+	private boolean acceptRanges = false;
 
     public ResponseHeaders(URI uri, RawHeaders headers) {
         this.uri = uri;
@@ -168,10 +171,10 @@ public final class ResponseHeaders {
             } else if ("Transfer-Encoding".equalsIgnoreCase(fieldName)) {
                 transferEncoding = value;
             } else if ("Content-Length".equalsIgnoreCase(fieldName)) {
-                try {
+                try
+                {
                     contentLength = Integer.parseInt(value);
-                } catch (NumberFormatException ignored) {
-                }
+                } catch (NumberFormatException ignored) {}
             } else if ("Connection".equalsIgnoreCase(fieldName)) {
                 connection = value;
             } else if (SENT_MILLIS.equalsIgnoreCase(fieldName)) {
@@ -182,8 +185,19 @@ public final class ResponseHeaders {
 				System.out.println("622 - ResponseHeaders - Content-Range = " + value);
 				chunk = value.split(" ")[1].split("/")[0];
 				SIZE = Integer.parseInt(value.split(" ")[1].split("/")[1]);
+			} else if("Accept-Ranges".equalsIgnoreCase(fieldName)) {
+				System.out.println("622 - ResponseHeaders - Accept-Ranges = " + value);
+				acceptRanges = true;
 			}
         }
+        
+        number++;
+    }
+    
+    public void printHeaders()
+    {
+    	System.out.println("MIC : ResponseHeaders: printHeaders()");
+    	headers.printRawHeaders("Response Number = "+Integer.toString(number));
     }
 
 	public String getChunkMarkings() {
@@ -193,6 +207,7 @@ public final class ResponseHeaders {
 	public int getDownloadSize() {
 		return SIZE;
 	}
+	
 
     public boolean isContentEncodingGzip() {
         return "gzip".equalsIgnoreCase(contentEncoding);
@@ -278,6 +293,10 @@ public final class ResponseHeaders {
 
     public String getConnection() {
         return connection;
+    }
+    
+    public boolean supportsRanges() {
+        return acceptRanges;
     }
 
     public void setLocalTimestamps(long sentRequestMillis, long receivedResponseMillis) {

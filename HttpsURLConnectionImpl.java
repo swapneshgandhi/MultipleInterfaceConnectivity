@@ -175,9 +175,11 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
 
     @Override
     public int getResponseCode() throws IOException {
-    	System.out.println("MIC : HttpsURLConnectionImpl: getResponseCode()");
+    	System.out.println("MIC : HttpsURLConnectionImpl: Header: getResponseCode()");
     	System.out.println("MIC : HttpsURLConnectionImpl: getResponseCode() -> calling delegate.getResponseCode()");
-        return delegate.getResponseCode();
+    	int resCode = delegate.getResponseCode();
+		System.out.println("MIC : HttpsURLConnectionImpl: Header: getResponseCode() = "+Integer.toString(resCode));
+        return resCode;
     }
 
     @Override
@@ -192,6 +194,16 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
     	System.out.println("MIC : HttpsURLConnectionImpl: setRequestMethod("+method+")");
     	System.out.println("MIC : HttpsURLConnectionImpl: setRequestMethod() -> calling delegate.setRequestMethod()");
         delegate.setRequestMethod(method);
+        /*
+        if(method == HttpEngine.POST || method == HttpEngine.PUT)
+        {
+        	delegate.isVanilla = true;
+        }
+        else
+        {
+        	delegate.isVanilla = false;
+        }
+        */
     }
 
     @Override
@@ -331,9 +343,15 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
 
     @Override
     public String getHeaderField(String key) {
+    	System.out.println("MIC : HttpsURLConnectionImpl: Header: getHeaderField("+key+")");
     	System.out.println("MIC : HttpsURLConnectionImpl: getHeaderField("+key+")");
     	System.out.println("MIC : HttpsURLConnectionImpl: getHeaderField("+key+") -> calling delegate.getHeaderField("+key+")");
-        return delegate.getHeaderField(key);
+    	String headerVal = delegate.getHeaderField(key);
+    	if(headerVal != null)
+    		System.out.println("MIC : HttpsURLConnectionImpl: Header: getHeaderField("+key+") = "+headerVal);
+    	else
+    		System.out.println("MIC : HttpsURLConnectionImpl: Header: getHeaderField("+key+") = null");
+        return headerVal;
     }
 
     @Override
@@ -439,6 +457,7 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
     	System.out.println("MIC : HttpsURLConnectionImpl: setDoOutput("+Boolean.toString(newValue)+")");
     	System.out.println("MIC : HttpsURLConnectionImpl: setDoOutput("+Boolean.toString(newValue)+") -> calling delegate.setDoOutput("+Boolean.toString(newValue)+")");
         delegate.setDoOutput(newValue);
+        //delegate.isVanilla = true;
     }
 
     @Override
@@ -511,14 +530,17 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
         delegate.setChunkedStreamingMode(chunkLength);
     }
 
-    private final class HttpUrlConnectionDelegate extends HttpURLConnectionImpl {
-        private HttpUrlConnectionDelegate(URL url, int port) {
+    
+    public final class HttpUrlConnectionDelegate extends HttpURLConnectionImpl {
+        public HttpUrlConnectionDelegate(URL url, int port) {
             super(url, port);
+            this.setHttps(true);
             System.out.println("MIC : HttpsURLConnectionImpl: HttpUrlConnectionDelegate: HttpUrlConnectionDelegate(url = "+url.toString()+", port = "+Integer.toString(port)+")");
         }
 
-        private HttpUrlConnectionDelegate(URL url, int port, Proxy proxy) {
+        public HttpUrlConnectionDelegate(URL url, int port, Proxy proxy) {
             super(url, port, proxy);
+            this.setHttps(true);
             System.out.println("MIC : HttpsURLConnectionImpl: HttpUrlConnectionDelegate: HttpUrlConnectionDelegate(url = "+url.toString()+", port = "+Integer.toString(port)+", proxy = "+proxy.toString()+")");
         }
 
@@ -526,6 +548,13 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
                 HttpConnection connection, RetryableOutputStream requestBody) throws IOException {
         	System.out.println("MIC : HttpsURLConnectionImpl: HttpUrlConnectionDelegate: newHttpEngine( method = "+method+")");
             return new HttpsEngine(this, method, requestHeaders, connection, requestBody,
+                    HttpsURLConnectionImpl.this);
+        }
+        
+        @Override protected HttpEngine newHttpEngine(int type, String method, RawHeaders requestHeaders,
+                HttpConnection connection, RetryableOutputStream requestBody) throws IOException {
+        	System.out.println("MIC : HttpsURLConnectionImpl: HttpUrlConnectionDelegate: newHttpEngine( method = "+method+")");
+            return new HttpsEngine(type, this, method, requestHeaders, connection, requestBody,
                     HttpsURLConnectionImpl.this);
         }
 
@@ -541,8 +570,9 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
             return engine != null ? engine.sslSocket : null;
         }
     }
+    
 
-    public static class HttpsEngine extends HttpEngine {
+    private static class HttpsEngine extends HttpEngine {
 
         /**
          * Local stash of HttpsEngine.connection.sslSocket for answering
@@ -568,6 +598,15 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
             this.enclosing = enclosing;
             System.out.println("MIC : HttpsURLConnectionImpl: HttpsEngine: HttpsEngine()");
         }
+        
+        private HttpsEngine(int type, HttpURLConnectionImpl policy, String method, RawHeaders requestHeaders,
+                HttpConnection connection, RetryableOutputStream requestBody,
+                HttpsURLConnectionImpl enclosing) throws IOException {
+            super(type, policy, method, requestHeaders, connection, requestBody);
+            this.sslSocket = connection != null ? connection.getSecureSocketIfConnected() : null;
+            this.enclosing = enclosing;
+            System.out.println("MIC : HttpsURLConnectionImpl: HttpsEngine: HttpsEngine()");
+        }
 
         @Override protected void connect() throws IOException {
             // first try an SSL connection with compression and
@@ -577,7 +616,7 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
         	System.out.println("MIC : HttpsURLConnectionImpl: HttpsEngine: connect()");
             boolean connectionReused;
             try {
-                connectionReused = makeSslConnection(true);
+                connectionReused = makeSslConnection(true); /////////////////
             } catch (IOException e) {
                 // If the problem was a CertificateException from the X509TrustManager,
                 // do not retry, we didn't have an abrupt server initiated exception.
@@ -622,8 +661,8 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
             if (sslSocket != null) {
                 return true;
             }
-            connection.setupSecureSocket(enclosing.getSSLSocketFactory(), tlsTolerant);
 
+            connection.setupSecureSocket(enclosing.getSSLSocketFactory(), tlsTolerant);        ///////////////////////
             return false;
         }
 
@@ -734,3 +773,4 @@ final class HttpsURLConnectionImpl extends HttpsURLConnection {
         }
     }
 }
+

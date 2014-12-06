@@ -294,4 +294,14 @@ public final class RawHeaders {
         }
         return result;
     }
+
+	public void printRawHeaders(String type) {
+		System.out.println("MIC : RawHeaders: Header: ********************************************************* Start Type = "+type);
+		for (int i = 0; i < namesAndValues.size(); i += 2) {
+            String fieldName = namesAndValues.get(i);
+            String value = namesAndValues.get(i + 1);
+            System.out.println("MIC : RawHeaders: Header: "+fieldName+" -> "+value);           
+        }
+		System.out.println("MIC : RawHeaders: Header: ********************************************************* End Type = "+type);
+	}
 }
